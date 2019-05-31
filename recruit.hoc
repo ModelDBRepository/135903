@@ -1,0 +1,158 @@
+
+
+strdef cmd
+numiters =2
+objref pr, pn[numiters]
+
+
+//gapstyle=14 //now with high .01 pyr-pyr gaps 0-81, 1-82, 2-83 ... 19-100
+gapstyle=15 //now with low .001 gaps
+
+
+pyrthr=100  //this is the threshold at which pyramidal cells will have a noise event at each 0.5 ms
+	//  the TGnet.tem will compare if a uniformly distributed number from 0-100 is > this threshold
+basketthr=100   //noise threshold for basket cells
+basktopyrgmax=5.5   //not used
+pyrgapgmax =0.005   //not used
+sigfreq=16    //frequency in Hz of the input signal
+realrunFlag=1
+singlerunFlag=0
+noiserunFlag=0
+Tstop   = 1600   //how many ms long this simulation will run
+
+driverthr=80   //this is the threshold for noise input to the Drivers
+//the four levels tested were:  55 (95 Hz), 65 (75 hz), 80 (50 hz), 85 (40 Hz)
+//this number is held constant, and saved in the filename as "_f##"
+
+{load_file("nrngui.hoc") }
+{load_file("stdrun.hoc")}
+{load_file("stdlib.hoc")} 
+{load_file("netparmpi.hoc")}  //this gets loaded, but it was never run in parallel--several functions are not
+// parallel-safe
+{load_file("./templates/recruitnet.tem")}  //this creates the network
+
+
+proc init() {  
+
+	{pr.setScatteredVoltages(-85, -60)} //randomly starts each cell at different start voltages
+  	finitialize() 
+  	finitialize() 
+}
+
+
+
+
+celsius = 34
+iteration=0
+{cvode.active(0)}
+
+proc DoRun() { localobj fo, fo1
+{pr  = new Recruitnet()}
+
+{pr.recordVoltages()}
+if (noiserunFlag) {pr.recordnoise()}  //this is to record just the response of the noise, not the whole net
+
+{pr.pnm.set_maxstep(0.01)}
+
+{pr.pnm.want_all_spikes()}
+
+runningTime = startsw()
+
+stdinit()
+
+
+
+{pr.activeSynapsesRandom(Tstop, pyrthr, basketthr, driverthr)}  // pyr threshold, bask threshold, driving pyr thresh
+//that function creates all the noise events
+
+{pr.pnm.psolve(Tstop)}  //solve the simulation
+
+
+//below is a function to save files when I am recording from just one cell
+//or check if this is a full "realrun" with the whole network
+//or else just save a generic data file
+	if (singlerunFlag) {pr.writesingleVoltage(basketthr,pyrthr,sigfreq)
+		} else if (realrunFlag) {pr.writeVoltages(basketthr,pyrthr,gapstyle,driverthr)
+		} else {pr.writeVoltages()}
+
+
+//now check if it is also recording the noise sources
+	if (noiserunFlag) {pr.writenoise(pyrthr)}
+
+
+	{pr.pnm.pc.runworker()}   //this was not doing anything at present
+	runningTime = startsw() - runningTime
+	iteration=iteration+1
+	print "Running Time: ", runningTime, "iteration: ",iteration
+
+//now will save a spike raster
+	{pr.pnm.gatherspikes()}
+	fo = new File()
+	fo1= new File()
+	sprint(cmd, "data/spikes.dat")
+	{fo1.wopen(cmd)}
+	sprint(cmd, "data/spikes_b%d_p%d_g%d_f%d.dat",basketthr,pyrthr,gapstyle,driverthr)
+	if (realrunFlag) {fo.wopen(cmd)}
+
+   	for i=0, pr.pnm.spikevec.size-1 {
+	if (realrunFlag) fo.printf("%-10.6lf, %d\n", pr.pnm.spikevec.x[i], pr.pnm.idvec.x[i])
+		fo1.printf("%-10.6lf, %d\n", pr.pnm.spikevec.x[i], pr.pnm.idvec.x[i])
+		}
+
+ 
+if (realrunFlag) {fo.close()}
+{fo1.close()}
+
+{pr.pnm.pc.done()}
+
+// now will save a history file for later use, to keep track of all files done
+if (realrunFlag){
+	{fo=new File()}
+	{sprint(cmd, "spikes_b%d_p%d_g%d_f%d.dat",basketthr,pyrthr,gapstyle,driverthr)}
+	{fo.aopen("data/spikelog.dat")}
+	{fo.printf("%s\n",cmd)}
+	{fo.close()}
+	{fo=new File()}
+	{sprint(cmd, "sum_b%d_p%d_g%d_f%d.dat",basketthr,pyrthr,gapstyle,driverthr)}
+	{fo.aopen("data/sumlog.dat")}
+	{fo.printf("%s\n",cmd)}
+	{fo.close()}
+	}
+
+if (singlerunFlag){
+	{fo=new File()}
+	{sprint(cmd, "1_b%d_p%d_single_f%d.dat",basketthr,pyrthr,sigfreq)}
+	{fo.aopen("data/singlelog.dat")}
+	{fo.printf("%s\n",cmd)}
+	{fo.close()}
+	{fo=new File()}
+	}
+
+if (noiserunFlag){
+	{fo=new File()}
+	{sprint(cmd, "noise_b%d.dat",pyrthr)}
+	{fo.aopen("data/noiselog.dat")}
+	{fo.printf("%s\n",cmd)}
+	{fo.close()}
+	{fo=new File()}
+	}
+
+
+{pr.pnm.pc.gid_clear()}   //need to clear GIDs to reset the system
+}
+
+//this is how I do multiple runs.  
+//from other testing I have determined that pyrthr 95 yields input noise of 0.008 nA2, 85 is 0.06 nA2, and 75 is 0.11 nA2
+sigfreq=0
+basketthr=100
+
+driverthr=85   //40 Hz Drivers
+pyrthr=92      //0.02 nA2 Neighbors
+DoRun()
+driverthr=65  //75 Hz Drivers
+pyrthr=70	   //0.15 nA2 Neighbors
+DoRun()
+driverthr=55  //95 hz Drivers
+pyrthr=85	  //0.06 nA2 Neighbors
+DoRun()
+return() //just makes an error to cancel the program
