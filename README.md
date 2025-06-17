@@ -25,18 +25,18 @@ coherent oscillations in a hippocampal computer model.
    - **gapstyle**: whenever you alter the files in \parameters, change this number and record what the changes were  
    - **sigfreq**: frequency of periodic signal. Not used in this simulation  
    - **driverthr**: Noise level to the Drivers. this number is held constant, and saved in the filename as "_f##"  
-     >>>the four levels tested were: 55 (95 Hz), 65 (75 hz), 80 (50 hz), 85 (40 Hz)
+     >the four levels tested were: 55 (95 Hz), 65 (75 hz), 80 (50 hz), 85 (40 Hz)
 
    Within \parameters\recruitconn.dat  
    - This file lists all synaptic and gap junctional connections, based on the parameters of synapses.par  
    - The current recruitconn.dat has the full feedback network of pyr - basket - pyr connections described.  
-     >>>>It also has gap junctions between 20 Drivers and the 20 Neighbors.  
+     >It also has gap junctions between 20 Drivers and the 20 Neighbors.  
    - There are several additional recruitconn.dat files in the attached folder. These simply need to be moved to the \parameters directory and renamed "conn.dat"
 
    \parameters\synapses.par  
    - Here the gmax of the synapses is changed. For this paper, the gmax of the IE and EI synapses was constant.  
    - This was used to change the gap junctions' gmax to 0, 0.01, or 0.001 in the last line.  
-     >>>>It is currently set to 0.001
+     >It is currently set to 0.001
 
 The matlab analysis uses the file "figureanal.m", which calls "tricolorspikeraster.m"
 
